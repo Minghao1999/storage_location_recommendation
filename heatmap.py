@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.widgets import RadioButtons, TextBox, Button
 import tkinter as tk
+from db_helper import get_sku_info
 
 
 def run_heatmap(inventory_path, empty_path):
@@ -367,12 +368,10 @@ def run_heatmap(inventory_path, empty_path):
 
         sku = text_box.text.strip()
 
-        sku_data = inventory_all[
-            inventory_all["SKU"] == sku
-        ]
+        sku_info = get_sku_info(sku)
         # ===== SKU不存在 =====
 
-        if sku_data.empty:
+        if sku_info is None:
 
             popup = tk.Toplevel()
             popup.title("New SKU")

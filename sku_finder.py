@@ -1,3 +1,5 @@
+from db_helper import get_sku_info
+
 def get_remaining_space(df):
 
     capacity = 120
@@ -20,64 +22,118 @@ def get_remaining_space(df):
     return remaining
 
 
+# def find_location_by_sku(df, inventory_all, sku):
+
+#     sku = sku.strip().upper()
+
+#     sku_info = get_sku_info(sku)
+
+#     if sku_info is None:
+#         return None, None, None
+
+#     item_len = sku_info["最长边"]
+
+#     remaining = get_remaining_space(df)
+
+#     # ===== 当前仓库这个SKU在哪些层 =====
+
+#     sku_locations = df[
+#         df["SKU"].astype(str).str.strip().str.upper() == sku
+#     ]
+
+#     # ===== SKU 是否在 A>24 =====
+
+#     sku_all_locations = inventory_all[
+#         inventory_all["SKU"].astype(str).str.strip().str.upper() == sku
+#     ]
+
+#     loc = sku_all_locations.iloc[:,15].astype(str)
+#     sku_A = loc.str.extract(r"A(\d+)")[0].astype(float)
+
+#     out_of_range = any(sku_A > 24)
+
+#     L1_has_sku = any(sku_locations["L"] == 1)
+
+#     # ===== 情况1：L1没有这个SKU → 优先L1 =====
+
+#     if not L1_has_sku and not out_of_range:
+
+#         for (A,R,L), space in remaining.items():
+
+#             if L == 1 and space >= item_len:
+#                 if out_of_range:
+#                     return f"Out of Range → A{A}-R{R}-L{L}", item_len, space
+#                 else:
+#                     return f"A{A}-R{R}-L{L}", item_len, space
+
+#     # ===== 情况2：L1已有SKU → 从L2开始 =====
+
+#     for level in [2,3,4]:
+
+#         for (A,R,L), space in remaining.items():
+
+#             if L == level and space >= item_len:
+#                 if out_of_range:
+#                     return f"Out of Range → A{A}-R{R}-L{L}", item_len, space
+#                 else:
+#                     return f"A{A}-R{R}-L{L}", item_len, space
+
+#     return None, item_len, None
+
+
+from db_helper import get_sku_info
+
 def find_location_by_sku(df, inventory_all, sku):
 
     sku = sku.strip().upper()
 
-    sku_data = inventory_all[
-        inventory_all["SKU"].astype(str).str.strip().str.upper() == sku
-    ]
+    # ===== 从数据库查SKU =====
+    sku_info = get_sku_info(sku)
 
-    # SKU不存在 → 走新SKU逻辑
-    if sku_data.empty:
+    if sku_info is None:
         return None, None, None
 
-    item_len = sku_data["长"].max()
+    item_len = sku_info["最长边"]
 
     remaining = get_remaining_space(df)
 
-    # ===== 当前仓库这个SKU在哪些层 =====
-
+    # ===== Excel库存 =====
     sku_locations = df[
         df["SKU"].astype(str).str.strip().str.upper() == sku
     ]
 
-    # ===== SKU 是否在 A>24 =====
+    warehouse_has_sku = not sku_locations.empty
 
-    sku_all_locations = inventory_all[
-        inventory_all["SKU"].astype(str).str.strip().str.upper() == sku
-    ]
+    # ===== 仓库有SKU =====
+    if warehouse_has_sku:
 
-    loc = sku_all_locations.iloc[:,15].astype(str)
-    sku_A = loc.str.extract(r"A(\d+)")[0].astype(float)
+        L1_has_sku = any(sku_locations["L"] == 1)
 
-    out_of_range = any(sku_A > 24)
+        # L1有 → L2+
+        if L1_has_sku:
 
-    L1_has_sku = any(sku_locations["L"] == 1)
+            for level in [2,3,4]:
 
-    # ===== 情况1：L1没有这个SKU → 优先L1 =====
+                for (A,R,L), space in remaining.items():
 
-    if not L1_has_sku and not out_of_range:
+                    if L == level and space >= item_len:
+                        return f"A{A}-R{R}-L{L}", item_len, space
+
+        # L1没有 → L1
+        else:
+
+            for (A,R,L), space in remaining.items():
+
+                if L == 1 and space >= item_len:
+                    return f"A{A}-R{R}-L{L}", item_len, space
+
+    # ===== 仓库没有SKU =====
+    else:
 
         for (A,R,L), space in remaining.items():
 
             if L == 1 and space >= item_len:
-                if out_of_range:
-                    return f"Out of Range → A{A}-R{R}-L{L}", item_len, space
-                else:
-                    return f"A{A}-R{R}-L{L}", item_len, space
-
-    # ===== 情况2：L1已有SKU → 从L2开始 =====
-
-    for level in [2,3,4]:
-
-        for (A,R,L), space in remaining.items():
-
-            if L == level and space >= item_len:
-                if out_of_range:
-                    return f"Out of Range → A{A}-R{R}-L{L}", item_len, space
-                else:
-                    return f"A{A}-R{R}-L{L}", item_len, space
+                return f"A{A}-R{R}-L{L}", item_len, space
 
     return None, item_len, None
 
