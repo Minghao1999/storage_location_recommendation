@@ -6,6 +6,8 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.widgets import RadioButtons, Button
 import tkinter as tk
 from db_helper import get_sku_info
+from matplotlib.patches import Rectangle
+
 
 
 def run_heatmap(inventory_path, empty_path):
@@ -131,6 +133,43 @@ def run_heatmap(inventory_path, empty_path):
     )
 
     annot_box.set_visible(False)
+
+    highlight_rect = None
+
+    def highlight_location(location):
+
+        nonlocal highlight_rect
+
+        if location is None:
+            return
+
+        try:
+            parts = location.split("-")
+            A = int(parts[0].replace("A",""))
+            R = int(parts[1].replace("R",""))
+
+            col = list(current_heatmap_data.columns).index(A)
+            row = list(current_heatmap_data.index).index(R)
+
+        except:
+            return
+
+        # 删除旧框
+        if highlight_rect:
+            highlight_rect.remove()
+
+        highlight_rect = Rectangle(
+            (col, row),
+            1,
+            1,
+            fill=False,
+            edgecolor="blue",
+            linewidth=3
+        )
+
+        ax_heatmap.add_patch(highlight_rect)
+
+        fig.canvas.draw_idle()
 
     ax_heatmap.set_title("Warehouse Utilization (Total)")
     ax_heatmap.set_xlabel("A Row")
@@ -412,6 +451,8 @@ def run_heatmap(inventory_path, empty_path):
                             f"Remaining:\n{space:.0f}\""
                         )
 
+                        highlight_location(location)
+
                     else:
 
                         result_text.set_text(
@@ -441,6 +482,8 @@ def run_heatmap(inventory_path, empty_path):
                 f"Suggested:\n{location}\n\n"
                 f"Remaining:\n{space:.0f}\""
             )
+
+            highlight_location(location)
 
         else:
 
