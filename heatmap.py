@@ -65,7 +65,9 @@ def run_heatmap(inventory_path, empty_path):
     axbutton = plt.axes([0.80,0.86,0.15,0.04])
     search_button = Button(axbutton, "Search")
     def ask_sku_popup():
-        popup = tk.Toplevel()
+        root = tk.Tk()
+        root.withdraw() 
+        popup = tk.Toplevel(root)
         popup.title("Enter SKU")
         popup.geometry("300x120")
 
@@ -100,7 +102,6 @@ def run_heatmap(inventory_path, empty_path):
         tk.Button(popup, text="Confirm", command=confirm).pack(pady=8)
         entry.bind("<Return>", lambda event: confirm())
 
-        popup.grab_set()
         popup.wait_window()
 
         return result["value"]
