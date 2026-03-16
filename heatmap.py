@@ -3,7 +3,7 @@ from sku_finder import find_location_by_sku, find_location_by_size
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
-from matplotlib.widgets import RadioButtons, TextBox, Button
+from matplotlib.widgets import RadioButtons, Button
 import tkinter as tk
 from db_helper import get_sku_info
 
@@ -58,29 +58,50 @@ def run_heatmap(inventory_path, empty_path):
     ax_heatmap = plt.axes([0.25,0.1,0.65,0.8])
     ax_L = plt.axes([0.92,0.1,0.05,0.8])
     ax_menu = plt.axes([0.05,0.4,0.12,0.25])
-    # SKU输入框
-    axbox = plt.axes([0.80,0.92,0.15,0.04])
-    text_box = TextBox(axbox, "SKU")
-
-    def paste_sku(event):
-
-        if event.key == "ctrl+v":
-            try:
-                root = tk.Tk()
-                root.withdraw()
-                clipboard = root.clipboard_get()
-
-                text_box.set_val(clipboard)
-
-            except:
-                pass
-
-    fig.canvas.mpl_connect("key_press_event", paste_sku)
 
     # 查询按钮
     axbutton = plt.axes([0.80,0.86,0.15,0.04])
     search_button = Button(axbutton, "Search")
-    text_box.ax.set_visible(False)
+    def ask_sku_popup():
+        popup = tk.Toplevel()
+        popup.title("Enter SKU")
+        popup.geometry("300x120")
+
+        tk.Label(popup, text="SKU:").pack(pady=5)
+
+        entry = tk.Entry(popup, width=30)
+        entry.pack(pady=5)
+        entry.focus_set()
+
+        def select_all_on_double_click(event):
+            widget = event.widget
+            widget.after(1, lambda: widget.select_range(0, 'end'))
+            widget.after(1, lambda: widget.icursor('end'))
+            return "break"
+
+        def select_all_on_ctrl_a(event):
+            widget = event.widget
+            widget.select_range(0, 'end')
+            widget.icursor('end')
+            return "break"
+
+        entry.bind("<Double-Button-1>", select_all_on_double_click)
+        entry.bind("<Control-a>", select_all_on_ctrl_a)
+        entry.bind("<Control-A>", select_all_on_ctrl_a)
+
+        result = {"value": None}
+
+        def confirm():
+            result["value"] = entry.get().strip()
+            popup.destroy()
+
+        tk.Button(popup, text="Confirm", command=confirm).pack(pady=8)
+        entry.bind("<Return>", lambda event: confirm())
+
+        popup.grab_set()
+        popup.wait_window()
+
+        return result["value"]
     axbutton.set_visible(False)
 
     current_mode = "Total"
@@ -162,7 +183,8 @@ def run_heatmap(inventory_path, empty_path):
                 fig.canvas.draw_idle()
                 return
             # ===== 正常计算 =====
-            used_length = subset[subset["status"]=="occupied"]["长"].sum()
+            occupied = subset[subset["status"] == "occupied"].copy()
+            used_length = occupied[["长", "宽", "高"]].max(axis=1).sum()
             capacity = 120
             remaining = capacity - used_length
 
@@ -238,28 +260,6 @@ def run_heatmap(inventory_path, empty_path):
 
     radio = RadioButtons(ax_menu, levels)
 
-    def get_remaining_space():
-
-        capacity = 120
-
-        remaining = {}
-
-        slots = df.groupby(["A","R","L"]).size().index
-
-        for (A,R,L) in slots:
-
-            subset = df[
-                (df["A"] == A) &
-                (df["R"] == R) &
-                (df["L"] == L)
-            ]
-
-            used_len = subset[subset["status"]=="occupied"]["长"].sum()
-
-            remaining[(A,R,L)] = capacity - used_len
-
-        return remaining
-
     def compute_capacity_heatmap(data):
 
         capacity = 120
@@ -269,8 +269,11 @@ def run_heatmap(inventory_path, empty_path):
         total = data.groupby(["A", "R"]).size().unstack()
 
         # 已占用长度
-        used = data[data["status"] == "occupied"].groupby(["A", "R"])["长"].sum().unstack()
+        occupied = data[data["status"] == "occupied"].copy()
+        used_per_item = occupied[["长", "宽", "高"]].max(axis=1)
+        occupied = occupied.assign(占用长度=used_per_item)
 
+        used = occupied.groupby(["A", "R"])["占用长度"].sum().unstack()
         # 对齐到真实存在的位置
         used = used.reindex(index=total.index, columns=total.columns)
 
@@ -300,21 +303,18 @@ def run_heatmap(inventory_path, empty_path):
         ax_heatmap.clear()
 
         for cbar in fig.axes:
-            if cbar not in [ax_heatmap, ax_L, ax_menu, axbox, axbutton, ax_result]:
+            if cbar not in [ax_heatmap, ax_L, ax_menu, axbutton, ax_result]:
                 fig.delaxes(cbar)
 
         if label == "Total":
             data = df
             ax_L.axis("off")
-
-            text_box.ax.set_visible(False)
             axbutton.set_visible(False)
         else:
             level = int(label.replace("L",""))
             data = df[df["L"] == level]
             ax_L.clear()
             ax_L.axis("off")
-            text_box.ax.set_visible(True)
             axbutton.set_visible(True)
 
         if label == "Total":
@@ -366,7 +366,10 @@ def run_heatmap(inventory_path, empty_path):
             fig.canvas.draw_idle()
             return
 
-        sku = text_box.text.strip()
+        sku = ask_sku_popup()
+
+        if not sku:
+            return
 
         sku_info = get_sku_info(sku)
         # ===== SKU不存在 =====
@@ -403,7 +406,7 @@ def run_heatmap(inventory_path, empty_path):
                     if location:
 
                         result_text.set_text(
-                            f"New SKU\n\n"
+                            f"New SKU: {sku}\n\n"
                             f"Longest side: {item_len:.0f}\" \n\n"
                             f"Suggested:\n{location}\n\n"
                             f"Remaining:\n{space:.0f}\""
@@ -412,7 +415,7 @@ def run_heatmap(inventory_path, empty_path):
                     else:
 
                         result_text.set_text(
-                            f"New SKU\n\n"
+                            f"New SKU: {sku}\n\n"
                             f"Longest side: {item_len:.0f}\" \n\n"
                             f"No available location"
                         )
@@ -433,6 +436,7 @@ def run_heatmap(inventory_path, empty_path):
         if location:
 
             result_text.set_text(
+                f"SKU: {sku}\n\n"
                 f"SKU length: {item_len:.0f}\" \n\n"
                 f"Suggested:\n{location}\n\n"
                 f"Remaining:\n{space:.0f}\""
@@ -441,6 +445,7 @@ def run_heatmap(inventory_path, empty_path):
         else:
 
             result_text.set_text(
+                f"SKU: {sku}\n\n"
                 f"SKU length: {item_len:.0f}\" \n\n"
                 f"No available location"
             )

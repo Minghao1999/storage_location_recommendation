@@ -1,6 +1,5 @@
 from db_helper import get_sku_info
 import pandas as pd
-from db_helper import get_sku_info
 
 def get_remaining_space(df):
     capacity = 120
