@@ -79,41 +79,22 @@ def find_location_by_sku(df, inventory_all, sku):
 
 def find_location_by_size(df, item_len):
 
-    capacity = 120
-    pallet_size = 40
+    remaining = get_remaining_space(df)
 
-    remaining = {}
+    # 找能放下的储位
+    valid_slots = {k:v for k,v in remaining.items() if v >= item_len}
 
-    slots = df.groupby(["A","R","L"]).size().index
-
-    for (A,R,L) in slots:
-
-        subset = df[
-            (df["A"] == A) &
-            (df["R"] == R) &
-            (df["L"] == L)
-        ]
-
-        occupied = subset[subset["status"] == "occupied"].copy()
-        used_len = occupied[["长", "宽", "高"]].max(axis=1).sum()
-
-        space = capacity - used_len
-
-        if space >= item_len:
-            remaining[(A,R,L)] = space
-
-    if not remaining:
+    if not valid_slots:
         return None, item_len, None
 
-    # ===== 优先 L1 =====
-
-    L1_slots = {k:v for k,v in remaining.items() if k[2] == 1}
+    # 优先 L1
+    L1_slots = {k:v for k,v in valid_slots.items() if k[2] == 1}
 
     if L1_slots:
         best = min(L1_slots, key=L1_slots.get)
     else:
-        best = min(remaining, key=remaining.get)
+        best = min(valid_slots, key=valid_slots.get)
 
     A,R,L = best
 
-    return f"A{A}-R{R}-L{L}", item_len, remaining[best]
+    return f"A{A}-R{R}-L{L}", item_len, valid_slots[best]
