@@ -1,87 +1,28 @@
 from db_helper import get_sku_info
+import pandas as pd
+from db_helper import get_sku_info
 
 def get_remaining_space(df):
-
     capacity = 120
+
+    occupied = df[df["status"] == "occupied"].copy()
+
+    for col in ["长", "宽", "高"]:
+        occupied[col] = pd.to_numeric(occupied[col], errors="coerce").fillna(0)
+
+    occupied["占用长度"] = occupied[["长", "宽", "高"]].max(axis=1)
+
+    used = occupied.groupby(["A", "R", "L"])["占用长度"].sum()
+
+    all_slots = df.groupby(["A", "R", "L"]).size().index
+
     remaining = {}
-
-    slots = df.groupby(["A","R","L"]).size().index
-
-    for (A,R,L) in slots:
-
-        subset = df[
-            (df["A"] == A) &
-            (df["R"] == R) &
-            (df["L"] == L)
-        ]
-
-        used_len = subset[subset["status"]=="occupied"]["长"].sum()
-
-        remaining[(A,R,L)] = capacity - used_len
+    for slot in all_slots:
+        used_len = used.get(slot, 0)
+        remaining[slot] = capacity - used_len
 
     return remaining
 
-
-# def find_location_by_sku(df, inventory_all, sku):
-
-#     sku = sku.strip().upper()
-
-#     sku_info = get_sku_info(sku)
-
-#     if sku_info is None:
-#         return None, None, None
-
-#     item_len = sku_info["最长边"]
-
-#     remaining = get_remaining_space(df)
-
-#     # ===== 当前仓库这个SKU在哪些层 =====
-
-#     sku_locations = df[
-#         df["SKU"].astype(str).str.strip().str.upper() == sku
-#     ]
-
-#     # ===== SKU 是否在 A>24 =====
-
-#     sku_all_locations = inventory_all[
-#         inventory_all["SKU"].astype(str).str.strip().str.upper() == sku
-#     ]
-
-#     loc = sku_all_locations.iloc[:,15].astype(str)
-#     sku_A = loc.str.extract(r"A(\d+)")[0].astype(float)
-
-#     out_of_range = any(sku_A > 24)
-
-#     L1_has_sku = any(sku_locations["L"] == 1)
-
-#     # ===== 情况1：L1没有这个SKU → 优先L1 =====
-
-#     if not L1_has_sku and not out_of_range:
-
-#         for (A,R,L), space in remaining.items():
-
-#             if L == 1 and space >= item_len:
-#                 if out_of_range:
-#                     return f"Out of Range → A{A}-R{R}-L{L}", item_len, space
-#                 else:
-#                     return f"A{A}-R{R}-L{L}", item_len, space
-
-#     # ===== 情况2：L1已有SKU → 从L2开始 =====
-
-#     for level in [2,3,4]:
-
-#         for (A,R,L), space in remaining.items():
-
-#             if L == level and space >= item_len:
-#                 if out_of_range:
-#                     return f"Out of Range → A{A}-R{R}-L{L}", item_len, space
-#                 else:
-#                     return f"A{A}-R{R}-L{L}", item_len, space
-
-#     return None, item_len, None
-
-
-from db_helper import get_sku_info
 
 def find_location_by_sku(df, inventory_all, sku):
 
@@ -154,7 +95,8 @@ def find_location_by_size(df, item_len):
             (df["L"] == L)
         ]
 
-        used_len = subset[subset["status"]=="occupied"]["长"].sum()
+        occupied = subset[subset["status"] == "occupied"].copy()
+        used_len = occupied[["长", "宽", "高"]].max(axis=1).sum()
 
         space = capacity - used_len
 
