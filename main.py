@@ -1,33 +1,41 @@
-import tkinter as tk
-from heatmap import run_heatmap
+import sys
+from PySide6.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout
+
+from heatmap_qt import run_heatmap_qt
 from gdrive.gdrive_loader import download_daily_files
 
 
-def run():
+class MainWindow(QWidget):
 
-    try:
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("Warehouse Heatmap Tool")
+        self.resize(300,150)
+
+        self.heatmap_window = None
+
+        layout = QVBoxLayout()
+
+        btn = QPushButton("Open Heatmap")
+        btn.clicked.connect(self.open_heatmap)
+
+        layout.addWidget(btn)
+
+        self.setLayout(layout)
+
+    def open_heatmap(self):
 
         inventory_file, empty_file = download_daily_files()
 
-        run_heatmap(inventory_file, empty_file)
-
-    except Exception as e:
-
-        print(e)
+        self.heatmap_window = run_heatmap_qt(inventory_file, empty_file)
 
 
-root = tk.Tk()
-root.title("Warehouse Heatmap Tool")
-root.geometry("300x120")
+if __name__ == "__main__":
 
-tk.Button(
-    root,
-    text="Open Heatmap",
-    command=run,
-    bg="green",
-    fg="white",
-    width=20,
-    height=2
-).pack(pady=30)
+    app = QApplication(sys.argv)
 
-root.mainloop()
+    window = MainWindow()
+    window.show()
+
+    sys.exit(app.exec())
