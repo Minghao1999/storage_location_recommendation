@@ -63,6 +63,7 @@ class HeatmapApp(QWidget):
         right = QVBoxLayout()
 
         self.sku_input = QLineEdit()
+        self.sku_input.returnPressed.connect(self.search_sku)
         self.sku_input.setPlaceholderText("Enter SKU")
 
         search_btn = QPushButton("Search")
