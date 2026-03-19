@@ -32,6 +32,8 @@ class HeatmapApp(QWidget):
         super().__init__()
         self.current_mode = "Total"
 
+        self.tooltip = None
+
         self.hover_elements = []
 
         self.df, self.inventory_all = load_data(inventory_path, empty_path)
@@ -165,6 +167,8 @@ class HeatmapApp(QWidget):
 
 
     def on_hover(self, event):
+        if not self.tooltip:
+            return
 
         # ===== 清 hover =====
         for elem in self.hover_elements:
@@ -181,6 +185,8 @@ class HeatmapApp(QWidget):
         ax = self.figure.axes[0]
 
         if event.inaxes != ax:
+            self.tooltip.set_visible(False)
+            self.canvas.draw_idle()
             return
 
         if event.xdata is None or event.ydata is None:
@@ -196,6 +202,8 @@ class HeatmapApp(QWidget):
         row = int(event.ydata)
 
         if col >= len(heatmap.columns) or row >= len(heatmap.index):
+            self.tooltip.set_visible(False)
+            self.canvas.draw_idle()
             return
 
         A = heatmap.columns[col]
@@ -231,8 +239,6 @@ class HeatmapApp(QWidget):
 
                 display.append((level, color))
 
-            # ===== 画右侧竖条 =====
-            ax.set_xlabel(f"A{A}-R{R}", fontsize=10)
 
             # ===== 连续竖条 =====
 
@@ -286,6 +292,12 @@ class HeatmapApp(QWidget):
                 )
                 self.hover_elements.append(txt)
 
+            text = f"A{A}-R{R}"
+
+            self.tooltip.xy = (event.xdata, event.ydata)
+            self.tooltip.set_text(text)
+            self.tooltip.set_visible(True)
+
             self.canvas.draw_idle()
             return
 
@@ -304,7 +316,10 @@ class HeatmapApp(QWidget):
                 f"No Slot"
             )
 
-            ax.set_xlabel(text, fontsize=10)
+            self.tooltip.xy = (event.xdata, event.ydata)
+            self.tooltip.set_text(text)
+            self.tooltip.set_visible(True)
+
             self.canvas.draw_idle()
             return
 
@@ -329,7 +344,10 @@ class HeatmapApp(QWidget):
             f"Remaining: {remaining:.0f}\"\n"
             f"Pallets fit: {pallets}"
         )
-        ax.set_xlabel(text, fontsize=10)
+
+        self.tooltip.xy = (event.xdata, event.ydata)
+        self.tooltip.set_text(text)
+        self.tooltip.set_visible(True)
 
         self.canvas.draw_idle()
 
@@ -494,6 +512,17 @@ class HeatmapApp(QWidget):
 
         ax = self.figure.add_subplot(111)
 
+        self.tooltip = ax.annotate(
+            "",
+            xy=(0, 0),
+            xytext=(-80, 20),  # 鼠标右上角
+            textcoords="offset points",
+            bbox=dict(boxstyle="round", fc="white", ec="black"),
+            fontsize=9
+        )
+
+        self.tooltip.set_visible(False)
+
         if self.current_mode == "Total":
 
             heatmap = self.compute_heatmap()
@@ -505,6 +534,11 @@ class HeatmapApp(QWidget):
             df_level = self.df[self.df["L"] == level]
 
             heatmap = self.compute_heatmap_level(df_level)
+
+            # ===== 固定白色的行 =====
+            if level in [1, 2]:
+                white_rows = [21, 22, 45, 46]
+                heatmap.loc[white_rows] = float("nan")
 
         if self.current_mode == "Total":
 
@@ -541,7 +575,7 @@ class HeatmapApp(QWidget):
 
         ax.set_title(title, fontsize=12, fontweight="bold")
 
-        self.figure.subplots_adjust(bottom=0.25)
+        self.figure.subplots_adjust(left=0.05, right=0.98, top=0.92, bottom=0.08)
 
         self.canvas.draw()
 
