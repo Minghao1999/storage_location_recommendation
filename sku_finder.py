@@ -1,9 +1,12 @@
 from db_helper import get_sku_info
 import pandas as pd
 
-def get_remaining_space(df):
-    capacity = 120
+def get_slot_capacity(R):
+    if R in [19, 20, 23, 24]:
+        return 80
+    return 120
 
+def get_remaining_space(df):
     occupied = df[df["status"] == "occupied"].copy()
 
     for col in ["长", "宽", "高"]:
@@ -17,8 +20,10 @@ def get_remaining_space(df):
 
     remaining = {}
     for slot in all_slots:
+        A, R, L = slot
+        capacity = get_slot_capacity(R)
         used_len = used.get(slot, 0)
-        remaining[slot] = capacity - used_len
+        remaining[slot] = max(0, capacity - used_len)
 
     return remaining
 

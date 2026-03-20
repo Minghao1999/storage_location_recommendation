@@ -28,6 +28,11 @@ def log(msg):
 
 class HeatmapApp(QWidget):
 
+    def get_slot_capacity(self, R):
+        if R in [19, 20, 23, 24]:
+            return 80
+        return 120
+
     def __init__(self, inventory_path, empty_path):
         super().__init__()
         self.current_mode = "Total"
@@ -226,7 +231,8 @@ class HeatmapApp(QWidget):
                 else:
                     occ = subset[subset["status"]=="occupied"]
                     used = occ[["长","宽","高"]].max(axis=1).sum()
-                    remaining = max(0, 120 - used)
+                    capacity = self.get_slot_capacity(R)
+                    remaining = max(0, capacity - used)
 
                     if remaining >= 120:
                         color = "green"
@@ -327,7 +333,8 @@ class HeatmapApp(QWidget):
 
         used = occ[["长","宽","高"]].max(axis=1).sum()
 
-        remaining = max(0, 120 - used)
+        capacity = self.get_slot_capacity(R)
+        remaining = max(0, capacity - used)
 
         if remaining >= 120:
             pallets = 3
@@ -337,7 +344,7 @@ class HeatmapApp(QWidget):
             pallets = 1
         else:
             pallets = 0
-
+            
         text = (
             f"A{A}-R{R}\n"
             f"Used: {used:.0f}\"\n"
@@ -467,7 +474,6 @@ class HeatmapApp(QWidget):
     
     def compute_heatmap_level(self, data):
 
-        capacity = 120
         pallet_size = 40
 
         total = self.df.groupby(["A","R"]).size().unstack()
@@ -475,16 +481,19 @@ class HeatmapApp(QWidget):
         occupied = data[data["status"]=="occupied"].copy()
 
         used = occupied[["长","宽","高"]].max(axis=1)
-
         occupied = occupied.assign(占用长度=used)
 
         used_sum = occupied.groupby(["A","R"])["占用长度"].sum().unstack()
-
         used_sum = used_sum.reindex(index=total.index, columns=total.columns)
-
         used_sum = used_sum.mask(total.notna() & used_sum.isna(), 0)
 
-        remaining = capacity - used_sum
+        # 每一行 R 对应不同容量
+        capacity_df = pd.DataFrame(index=total.index, columns=total.columns)
+        for r in capacity_df.index:
+            capacity_df.loc[r, :] = self.get_slot_capacity(r)
+
+        remaining = capacity_df.astype(float) - used_sum
+        remaining = remaining.clip(lower=0)
 
         capacity_left = (remaining // pallet_size)
 
