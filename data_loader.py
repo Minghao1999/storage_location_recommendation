@@ -6,8 +6,10 @@ def load_data(inventory_path, empty_path):
     inventory = pd.read_excel(inventory_path)
 
     inventory["长"] = pd.to_numeric(inventory.iloc[:,6], errors="coerce")
-    inventory["SKU"] = (
-        inventory.iloc[:,0]
+
+    # 客户SKU（C列）
+    inventory["CLIENT_SKU"] = (
+        inventory.iloc[:,2]
         .astype(str)
         .str.strip()
         .str.upper()
@@ -24,6 +26,11 @@ def load_data(inventory_path, empty_path):
     inventory_A = pd.to_numeric(inventory_loc.str.extract(r"A(\d+)")[0], errors="coerce")
 
     inventory_A24 = inventory[inventory_A.between(1,24)]
+
+    inventory_A24 = inventory_A24.copy()
+
+    # ⭐确保字段存在
+    inventory_A24["SKU_ALL"] = inventory_A24["CLIENT_SKU"]
 
     empty_loc = empty["储位编码"].astype(str)
     empty_A = pd.to_numeric(empty_loc.str.extract(r"A(\d+)")[0], errors="coerce")

@@ -38,8 +38,10 @@ def find_location_by_sku(df, inventory_all, sku):
     remaining = get_remaining_space(df)
 
     # ===== Excel库存 =====
+    sku = sku.strip().upper()
+
     sku_locations = df[
-        df["SKU"].astype(str).str.strip().str.upper() == sku
+        df["SKU_ALL"] == sku
     ]
 
     warehouse_has_sku = not sku_locations.empty

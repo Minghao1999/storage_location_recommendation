@@ -11,19 +11,21 @@ def normalize_columns(df):
 
     # 统一列名
     df = df.rename(columns={
-        "FOP商品编码": "SKU",
-        "商品名称": "商品名称",
-        "仓库采集商品长度": "长",
-        "仓库采集商品宽度": "宽",
-        "仓库采集商品高度": "高"
-    })
+    "FOP商品编码": "SKU",
+    "客户SKU": "CLIENT_SKU",
+    "商品名称": "商品名称",
+    "仓库采集商品长度": "长",
+    "仓库采集商品宽度": "宽",
+    "仓库采集商品高度": "高"
+})
 
-    needed = ["SKU", "商品名称", "长", "宽", "高"]
+    needed = ["SKU", "CLIENT_SKU", "商品名称", "长", "宽", "高"]
 
     df = df[needed].copy()
 
     # 数据清洗
     df["SKU"] = df["SKU"].astype(str).str.strip().str.upper()
+    df["CLIENT_SKU"] = df["CLIENT_SKU"].astype(str).str.strip().str.upper()
     df["商品名称"] = df["商品名称"].astype(str).str.strip()
 
     df["长"] = pd.to_numeric(df["长"], errors="coerce")
@@ -70,7 +72,8 @@ def main():
 
     # 建索引
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sku ON sku_info (SKU)")
-
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_client_sku ON sku_info (CLIENT_SKU)")
+    
     conn.commit()
     conn.close()
 
